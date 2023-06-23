@@ -11,7 +11,19 @@
 <!-- ENDIF -->
 
 <form id="acp_board" method="post" action="{U_ACTION}">
-	<fieldset>
+	<fieldset>	
+		<dl>
+			<dt>
+				<label for="s3_account_id">{L_ACP_S3_ACCOUNT_ID}</label>
+				<br>
+				<span>{L_ACP_S3_ACCOUNT_ID_EXPLAIN}</span>
+			</dt>
+			<dd>
+				<input type="text" id="s3_account_id" name="s3_account_id" value="{S3_ACCOUNT_ID}"
+					   maxlength="255" size="40"/>
+			</dd>
+		</dl>
+		
 		<dl>
 			<dt>
 				<label for="s3_aws_access_key_id">{L_ACP_S3_AWS_ACCESS_KEY_ID}</label>
@@ -55,6 +67,17 @@
 			</dt>
 			<dd>
 				<input type="text" id="s3_bucket" name="s3_bucket" value="{S3_BUCKET}" maxlength="255" size="30"/>
+			</dd>
+		</dl>
+		
+		<dl>
+			<dt>
+				<label for="s3_bucket">{L_ACP_S3_BUCKET_LINK}</label>
+				<br>
+				<span>{L_ACP_S3_BUCKET_LINK_EXPLAIN}</span>
+			</dt>
+			<dd>
+				<input type="text" id="s3_bucket_link" name="s3_bucket_link" value="{S3_BUCKET_LINK}" maxlength="255" size="30"/>
 			</dd>
 		</dl>
 

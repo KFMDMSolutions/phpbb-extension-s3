@@ -1,8 +1,8 @@
-# phpBB AWS S3 Extension
+# phpBB 3.1 AWS S3 Extension
 
 ## Description
 
-An extension for [phpBB 3.x](https://www.phpbb.com) that utilizes AWS S3 as the filesystem for uploaded files.
+An extension for [phpBB 3.1](https://www.phpbb.com) that utilizes AWS S3 as the filesystem for uploaded files.
 
 ## Installation
 

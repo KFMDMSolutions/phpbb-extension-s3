@@ -18,6 +18,8 @@ class release_0_1_0 extends \phpbb\db\migration\migration
 			['config.add', ['s3_aws_secret_access_key', '']],
 			['config.add', ['s3_region', '']],
 			['config.add', ['s3_bucket', '']],
+			['config.add', ['s3_account_id', '']],
+			['config.add', ['s3_bucket_link', '']],
 
 			[
 				'module.add',

@@ -2,7 +2,7 @@
 /**
  *
  * @package       phpBB Extension - S3
- * @copyright (c) 2020 Austin Maddox
+ * @copyright (c) 2017 Austin Maddox
  * @license       http://opensource.org/licenses/gpl-2.0.php GNU General Public License v2
  *
  */
@@ -30,12 +30,16 @@ class main_module
 			}
 
 			$errors = [];
-			if (!preg_match('/[A-Z0-9]{20}/', $request->variable('s3_aws_access_key_id', '')))
+			if (!preg_match('/[A-Z0-9]/', $request->variable('s3_aws_access_key_id', '')))
 			{
 				$errors[] = $user->lang('ACP_S3_AWS_ACCESS_KEY_ID_INVALID', $request->variable('s3_aws_access_key_id', ''));
 			}
+			if (!preg_match('/[A-Z0-9]/', $request->variable('s3_account_id', '')))
+			{
+				$errors[] = $user->lang('ACP_S3_ACCOUNT_ID_INVALID', $request->variable('s3_account_id', ''));
+			}
 
-			if (!preg_match('/[A-Za-z0-9\/+=]{40}/', $request->variable('s3_aws_secret_access_key', '')))
+			if (!preg_match('/[A-Za-z0-9\/+=]/', $request->variable('s3_aws_secret_access_key', '')))
 			{
 				$errors[] = $user->lang('ACP_S3_AWS_SECRET_ACCESS_KEY_INVALID', $request->variable('s3_aws_secret_access_key', ''));
 			}
@@ -49,37 +53,43 @@ class main_module
 			{
 				$errors[] = $user->lang('ACP_S3_BUCKET_INVALID');
 			}
+			if (empty($request->variable('s3_bucket_link', '')))
+			{
+				$errors[] = $user->lang('ACP_S3_BUCKET_LINK_INVALID');
+			}
 
 			// If we have no errors so far, let's ensure our AWS credentials are actually working.
 			if (!count($errors))
 			{
 				try
-				{
+				{			
 					// Instantiate an AWS S3 client.
 					$s3_client = new \Aws\S3\S3Client([
+						'endpoint' => "https://".$request->variable('s3_account_id', '').".r2.cloudflarestorage.com",
 						'credentials' => [
 							'key'    => $request->variable('s3_aws_access_key_id', ''),
-							'secret' => $request->variable('s3_aws_secret_access_key', ''),
+							'secret' => $request->variable('s3_aws_secret_access_key', '')
 						],
 						'http'        => [
-							'verify' => false,
+							'verify' => false
 						],
 						'region'      => $request->variable('s3_region', ''),
-						'version'     => 'latest',
+						'version'     => 'latest'
 					]);
 
 					// Upload a test file to ensure credentials are valid and everything is working properly.
 					$s3_client->upload($request->variable('s3_bucket', ''), 'test.txt', 'test body');
 
-					// Delete the test file.
+					//Delete the test file.
 					$s3_client->deleteObject([
 						'Bucket' => $request->variable('s3_bucket', ''),
-						'Key'    => 'test.txt',
+						'Key'    => 'test.txt'
 					]);
 				}
 				catch (\Aws\S3\Exception\S3Exception $e)
 				{
 					$errors[] = $e->getMessage();
+					
 				}
 			}
 
@@ -88,8 +98,10 @@ class main_module
 			{
 				$config->set('s3_aws_access_key_id', $request->variable('s3_aws_access_key_id', ''));
 				$config->set('s3_aws_secret_access_key', $request->variable('s3_aws_secret_access_key', ''));
+				$config->set('s3_account_id', $request->variable('s3_account_id', ''));
 				$config->set('s3_region', $request->variable('s3_region', ''));
 				$config->set('s3_bucket', $request->variable('s3_bucket', ''));
+				$config->set('s3_bucket_link', $request->variable('s3_bucket_link', ''));
 				$config->set('s3_is_enabled', 1);
 
 				trigger_error($user->lang('ACP_S3_SETTING_SAVED') . adm_back_link($this->u_action));
@@ -101,8 +113,10 @@ class main_module
 			'S3_ERROR'                 => isset($errors) ? ((count($errors)) ? implode('<br /><br />', $errors) : '') : '',
 			'S3_AWS_ACCESS_KEY_ID'     => $config['s3_aws_access_key_id'],
 			'S3_AWS_SECRET_ACCESS_KEY' => $config['s3_aws_secret_access_key'],
+			'S3_ACCOUNT_ID' 		   => $config['s3_account_id'],
 			'S3_REGION'                => $config['s3_region'],
 			'S3_BUCKET'                => $config['s3_bucket'],
+			'S3_BUCKET_LINK'                => $config['s3_bucket_link'],
 			'S3_IS_ENABLED'            => ($config['s3_is_enabled']) ? 'Enabled' : 'Disabled',
 		]);
 	}

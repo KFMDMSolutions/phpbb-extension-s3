@@ -2,7 +2,7 @@
 /**
  *
  * @package       phpBB Extension - S3
- * @copyright (c) 2020 Austin Maddox
+ * @copyright (c) 2017 Austin Maddox
  * @license       http://opensource.org/licenses/gpl-2.0.php GNU General Public License v2
  *
  */
@@ -10,6 +10,7 @@
 namespace AustinMaddox\s3\event;
 
 use Aws\S3\S3Client;
+use phpbb\controller\helper;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -31,23 +32,21 @@ class main_listener implements EventSubscriberInterface
 
 	/** @var S3Client */
 	protected $s3_client;
+	
+	/** @var \phpbb\controller\helper */
+	protected $controller_helper;
 
 	/**
 	 * Constructor
 	 *
-	 * @param \phpbb\config\config     $config   Config object
-	 * @param \phpbb\template\template $template Template object
-	 * @param \phpbb\user              $user     User object
-	 * @param                          $phpbb_root_path
-	 *
-	 * @access public
 	 */
-	public function __construct(\phpbb\config\config $config, \phpbb\template\template $template, \phpbb\user $user, $phpbb_root_path)
+	public function __construct(\phpbb\config\config $config, \phpbb\template\template $template, \phpbb\user $user, \phpbb\controller\helper $controller_helper, $phpbb_root_path)
 	{
 		$this->config = $config;
 		$this->template = $template;
 		$this->user = $user;
 		$this->phpbb_root_path = $phpbb_root_path;
+		$this->controller_helper = $controller_helper;
 
 		if ($this->config['s3_is_enabled'])
 		{
@@ -57,6 +56,7 @@ class main_listener implements EventSubscriberInterface
 					'key'    => $this->config['s3_aws_access_key_id'],
 					'secret' => $this->config['s3_aws_secret_access_key'],
 				],
+				'endpoint' => 'https://'.$this->config['s3_account_id'].'.r2.cloudflarestorage.com',
 				'debug'       => false,
 				'http'        => [
 					'verify' => false,
@@ -70,10 +70,10 @@ class main_listener implements EventSubscriberInterface
 	static public function getSubscribedEvents()
 	{
 		return [
-			'core.user_setup'                              => 'user_setup',
+			'core.user_setup'                               => 'user_setup',
 			'core.modify_uploaded_file'                     => 'modify_uploaded_file',
 			'core.delete_attachments_from_filesystem_after' => 'delete_attachments_from_filesystem_after',
-			'core.parse_attachments_modify_template_data'  => 'parse_attachments_modify_template_data',
+			'core.parse_attachments_modify_template_data'   => 'parse_attachments_modify_template_data',
 		];
 	}
 
@@ -88,7 +88,7 @@ class main_listener implements EventSubscriberInterface
 	}
 
 	/**
-	 * Event to modify uploaded file before submit to the post.
+	 * Event to modify uploaded file before submit to the post
 	 *
 	 * @param $event
 	 */
@@ -100,13 +100,14 @@ class main_listener implements EventSubscriberInterface
 
 			// Fullsize
 			$key = $filedata['physical_filename'];
+			$real_name = $filedata['real_filename'];
 			$body = file_get_contents($this->phpbb_root_path . $this->config['upload_path'] . '/' . $key);
-			$this->uploadFileToS3($key, $body, $filedata['mimetype']);
+			$this->uploadFileToS3($key, $body, $filedata['mimetype'], $real_name);
 		}
 	}
 
 	/**
-	 * Perform additional actions after attachment(s) deletion from the filesystem.
+	 * Perform additional actions after attachment(s) deletion from the filesystem
 	 *
 	 * @param $event
 	 */
@@ -139,8 +140,28 @@ class main_listener implements EventSubscriberInterface
 			$attachment = $event['attachment'];
 
 			$key = 'thumb_' . $attachment['physical_filename'];
-			$s3_thumb_image = '//' . $this->config['s3_bucket'] . '.s3.amazonaws.com/' . $key;
-			$s3_link = '//' . $this->config['s3_bucket'] . '.s3.amazonaws.com/' . $attachment['physical_filename'];
+			//$s3_link_thumb = '//pub-b643deb77ed840d3a544aba3f59b7b3a.r2.dev/' . $key;
+			
+			$s3_link_thumb = $this->controller_helper->route('austinmaddox_s3_downloader', array(
+				'filename'	=> $attachment['real_filename'],
+				'physical_name' =>$key,
+				'mimetype'		=> $attachment['mimetype'],
+				'topic_id'      => $attachment['topic_id'],
+				'post_id'		=> $attachment['post_msg_id']
+			));							
+			//$s3_link_thumb = '//' . $this->config['s3_bucket'] . '.s3.amazonaws.com/' . $key;
+			//$s3_link_fullsize = '//' . $this->config['s3_bucket'] . '.s3.amazonaws.com/' . $attachment['physical_filename'];
+			
+			//$s3_link_fullsize = '//pub-b643deb77ed840d3a544aba3f59b7b3a.r2.dev/' . $attachment['physical_filename'];
+			
+			$s3_link_fullsize = $this->controller_helper->route('austinmaddox_s3_downloader', array(
+				'filename'		=> $attachment['real_filename'],
+				'physical_name' => $attachment['physical_filename'],
+				'mimetype'		=> $attachment['mimetype'],
+				'topic_id'      => $attachment['topic_id'],
+				'post_id'		=> $attachment['post_msg_id']
+			));
+				
 			$local_thumbnail = $this->phpbb_root_path . $this->config['upload_path'] . '/' . $key;
 
 			if ($this->config['img_create_thumbnail'])
@@ -156,14 +177,16 @@ class main_listener implements EventSubscriberInterface
 
 						// Upload *only* the thumbnail to S3.
 						$body = file_get_contents($local_thumbnail);
-						$this->uploadFileToS3($key, $body, $attachment['mimetype']);
+						$this->uploadFileToS3($key, $body, $attachment['mimetype'], $attachment['real_filename']);
 					}
 				}
-				$block_array['THUMB_IMAGE'] = $s3_thumb_image;
+				$block_array['THUMB_IMAGE'] = $s3_link_thumb;
+				$block_array['U_DOWNLOAD_LINK'] = $s3_link_fullsize;
 			}
-			$block_array['U_DOWNLOAD_LINK'] = $s3_link;
-			$block_array['U_INLINE_LINK'] = $s3_link;
+			$block_array['U_DOWNLOAD_LINK'] = $s3_link_fullsize;
+			$block_array['U_INLINE_LINK'] = $s3_link_fullsize;
 			$event['block_array'] = $block_array;
+			
 		}
 	}
 
@@ -174,8 +197,9 @@ class main_listener implements EventSubscriberInterface
 	 * @param $body
 	 * @param $content_type
 	 */
-	private function uploadFileToS3($key, $body, $content_type)
+	private function uploadFileToS3($key, $body, $content_type, $real_name)
 	{
-		$this->s3_client->upload($this->config['s3_bucket'], $key, $body, 'public-read', ['params' => ['ContentType' => $content_type]]);
+		$options = array('ContentType' => $content_type, 'ContentDisposition' => "attachment; filename=\"{$real_name}\"");
+		$this->s3_client->upload($this->config['s3_bucket'], $key, $body, 'public-read', array('params' => $options));
 	}
 }

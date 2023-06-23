@@ -1,0 +1,6 @@
+austinmaddox_s3_downloader:
+    path: /downloader/{filename}
+    defaults: { _controller:AustinMaddox.s3.downloader:handle_download, file_name: "0", physical_name: "", mimetype: "", topic_id: "0", post_id: "0"}
+    requirements:
+        topic_id: \d+
+        post_id: \d+

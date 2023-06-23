@@ -2,9 +2,23 @@ services:
     AustinMaddox.s3.listener:
         class: AustinMaddox\s3\event\main_listener
         arguments:
-            - @config
-            - @template
-            - @user
+            - '@config'
+            - '@template'
+            - '@user'
+            - '@controller.helper'
             - %core.root_path%
         tags:
             - { name: event.listener }
+            
+    AustinMaddox.s3.downloader:
+        class: AustinMaddox\s3\controller\downloader
+        arguments:
+            - '@config'
+            - '@auth'
+            - '@content.visibility'
+            - '@dbal.conn'
+            - '@language'
+            - '@request'
+            - '@symfony_request'
+            - '%core.php_ext%'
+            - '%core.root_path%'

@@ -2,7 +2,7 @@
 /**
  *
  * @package       phpBB Extension - S3
- * @copyright (c) 2020 Austin Maddox
+ * @copyright (c) 2017 Austin Maddox
  * @license       http://opensource.org/licenses/gpl-2.0.php GNU General Public License v2
  *
  */
@@ -29,6 +29,10 @@ $lang = array_merge($lang, [
 	'ACP_S3_AWS_ACCESS_KEY_ID_EXPLAIN' => 'Enter your AWS Access Key Id for S3, e.g.: <samp>AKIAIOSFODNN7EXAMPLE</samp>.',
 	'ACP_S3_AWS_ACCESS_KEY_ID_INVALID' => '“%s” is not a valid AWS Access Key Id. It must be a combination of uppercase letters and/or numbers and exactly 20 characters.<br>Specifically, it must match the regular expression <code>/[A-Z0-9]{20})/</code>',
 
+	'ACP_S3_ACCOUNT_ID'         => 'AWS Acoount Id',
+	'ACP_S3_ACCOUNT_ID_EXPLAIN' => 'Enter your AWS Account Id for S3, e.g.: <samp>AKIAIOSFODNN7EXAMPLE</samp>.',
+	'ACP_S3_ACCOUNT_ID_INVALID' => '“%s” is not a valid AWS Access Key Id. It must be a combination of uppercase letters and/or numbers and exactly 20 characters.<br>Specifically, it must match the regular expression <code>/[A-Z0-9]{20})/</code>',
+
 	'ACP_S3_AWS_SECRET_ACCESS_KEY'         => 'AWS Secret Access Key',
 	'ACP_S3_AWS_SECRET_ACCESS_KEY_EXPLAIN' => 'Enter your AWS Secret Access Key for S3, e.g.: <samp>wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY</samp>.',
 	'ACP_S3_AWS_SECRET_ACCESS_KEY_INVALID' => '“%s” is not a valid AWS Secret Access Key. It must be a combination of letters and/or numbers, forward slashes (/), plus signs (+), equals signs (=), and exactly 40 characters.<br>Specifically, it must match the regular expression <code>/[A-Za-z0-9\/+=]{40}/</code>',
@@ -40,6 +44,10 @@ $lang = array_merge($lang, [
 	'ACP_S3_BUCKET'         => 'AWS S3 Bucket',
 	'ACP_S3_BUCKET_EXPLAIN' => 'Enter the name of your S3 bucket, e.g.: <samp>example-bucket</samp>. The bucket must already be created in your AWS account.',
 	'ACP_S3_BUCKET_INVALID' => 'You must enter a valid S3 bucket. For help working with Amazon S3 buckets, see the documentation here: http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html',
+
+	'ACP_S3_BUCKET_LINK'         => 'AWS S3 Bucket link',
+	'ACP_S3_BUCKET_LINK_EXPLAIN' => 'Enter the url of your S3 bucket, e.g.: <samp>example-bucket</samp>. The bucket must already be created in your AWS account.',
+	'ACP_S3_BUCKET_LINK_INVALID' => 'You must enter a valid S3 bucket. For help working with Amazon S3 buckets, see the documentation here: http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html',
 
 	'ACP_S3_IS_ENABLED'         => 'Is the extension enabled?',
 	'ACP_S3_IS_ENABLED_EXPLAIN' => 'Displays whether or not the extension is enabled and will use S3 for uploading and delivering your attachments.',
