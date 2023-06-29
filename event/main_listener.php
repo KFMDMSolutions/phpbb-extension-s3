@@ -140,26 +140,14 @@ class main_listener implements EventSubscriberInterface
 			$attachment = $event['attachment'];
 
 			$key = 'thumb_' . $attachment['physical_filename'];
-			//$s3_link_thumb = '//pub-b643deb77ed840d3a544aba3f59b7b3a.r2.dev/' . $key;
 			
 			$s3_link_thumb = $this->controller_helper->route('austinmaddox_s3_downloader', array(
-				'filename'	=> $attachment['real_filename'],
-				'physical_name' =>$key,
-				'mimetype'		=> $attachment['mimetype'],
-				'topic_id'      => $attachment['topic_id'],
-				'post_id'		=> $attachment['post_msg_id']
+				'file'	=> $attachment['attach_id'],
+				't' =>true
 			));							
-			//$s3_link_thumb = '//' . $this->config['s3_bucket'] . '.s3.amazonaws.com/' . $key;
-			//$s3_link_fullsize = '//' . $this->config['s3_bucket'] . '.s3.amazonaws.com/' . $attachment['physical_filename'];
-			
-			//$s3_link_fullsize = '//pub-b643deb77ed840d3a544aba3f59b7b3a.r2.dev/' . $attachment['physical_filename'];
 			
 			$s3_link_fullsize = $this->controller_helper->route('austinmaddox_s3_downloader', array(
-				'filename'		=> $attachment['real_filename'],
-				'physical_name' => $attachment['physical_filename'],
-				'mimetype'		=> $attachment['mimetype'],
-				'topic_id'      => $attachment['topic_id'],
-				'post_id'		=> $attachment['post_msg_id']
+				'file'		=> $attachment['attach_id']
 			));
 				
 			$local_thumbnail = $this->phpbb_root_path . $this->config['upload_path'] . '/' . $key;

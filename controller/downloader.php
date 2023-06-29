@@ -17,6 +17,7 @@ use phpbb\db\driver\driver_interface;
 use phpbb\exception\http_exception;
 use phpbb\language\language;
 use phpbb\request\request;
+use phpbb\user;
 use Symfony\Component\HttpFoundation\Request as symfony_request;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,6 +28,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Event listener
  */
+ abstract class attachment_category
+{
+	/** @var int None category */
+	public const NONE = 0;
+
+	/** @var int Inline images */
+	public const IMAGE = 1;
+
+	/** @var int Not used within the database, only while displaying posts */
+	public const THUMB = 4;
+
+	/** @var int Browser-playable audio files */
+	public const AUDIO = 7;
+
+	/** @var int Browser-playable video files */
+	public const VIDEO = 8;
+}
 class downloader
 {
 	/** @var config */
@@ -59,6 +77,9 @@ class downloader
 	*/
 	protected $php_ext;
 	
+	/** @var user */
+	protected $user;
+	
 	
 		/**
 	 * Constructor
@@ -76,54 +97,59 @@ class downloader
 	 * @param user					$user
 	 */
 	 
-	public function __construct(config $config, auth $auth, content_visibility $content_visibility, driver_interface $db, language $language, request $request, symfony_request $symfony_request)
+	public function __construct(config $config, auth $auth, content_visibility $content_visibility, driver_interface $db, language $language, request $request, symfony_request $symfony_request, user $user)
 	{
-		//parent::__construct($cache, $db, $storage, $symfony_request);
-
 		$this->auth = $auth;
 		$this->config = $config;
 		$this->content_visibility = $content_visibility;
 		$this->db = $db;
 		$this->language = $language;
 		$this->request = $request;
+		$this->user = $user;
 	}
 
-	// public function __construct($config, $auth, $db, $request, $phpbb_root_path, $php_ext)
-	// {
-		// $this->config = $config;
-		// $this->auth = $auth;
-		// $this->db = $db;
-		// $this->request = $request;
-		// $this->phpbb_root_path = $phpbb_root_path;
-		// $this->php_ext = $phpEx;
-	// }
-	
-	/**
-	 * {@inheritdoc}
-	 */
-	public function handle_download($filename):Response
+	public function handle_download($file):Response
     {
+		$attach_id = (int) $file;
+		$thumbnail = $this->request->variable('t', false);
 		$this->language->add_lang('viewtopic');
 		
-		//real_name, $physical_name, $mimetype, $topic_id $post_id
-		$physical_name = $this->request->variable('physical_name', '');
-		$mimetype = $this->request->variable('mimetype', '');
-		$topic_id = $this->request->variable('topic_id', 0);
-		$post_id = $this->request->variable('post_id', '');
-		
-		if (!$filename)
+		if (!$this->config['allow_attachments'] && !$this->config['allow_pm_attach'])
 		{
-			//send_status_line(404, 'Not Found');
-			throw new http_exception(404, 'ERROR_NO_ATTACHMENT');
-			
+			throw new http_exception(404, 'ATTACHMENT_FUNCTIONALITY_DISABLED');
 		}
-		//require($phpbb_root_path . 'includes/functions_download' . '.' . $phpEx);
-		//phpbb_download_handle_forum_auth($db, $auth, $topic_id);
 
-		$this->phpbb_download_handle_forum_auth($topic_id);
+		if (!$attach_id)
+		{
+			throw new http_exception(404, 'NO_ATTACHMENT_SELECTED');
+		}
+	
+		$sql = 'SELECT attach_id, post_msg_id, topic_id, in_message, poster_id,
+				is_orphan, physical_filename, real_filename, extension, mimetype,
+				filesize, filetime
+			FROM ' . ATTACHMENTS_TABLE . "
+			WHERE attach_id = $attach_id";
+		$result = $this->db->sql_query($sql);
+		$attachment = $this->db->sql_fetchrow($result);
+		$this->db->sql_freeresult($result);
+		
+		if (!$attachment)
+		{
+			throw new http_exception(404, 'ERROR_NO_ATTACHMENT');		
+		}
+		
+		$attachment['physical_filename'] = utf8_basename($attachment['physical_filename']);
+
+		if ((!$attachment['in_message'] && !$this->config['allow_attachments']) ||
+			($attachment['in_message'] && !$this->config['allow_pm_attach']))
+		{
+			throw new http_exception(404, 'ATTACHMENT_FUNCTIONALITY_DISABLED');
+		}
+
+		$this->phpbb_download_handle_forum_auth($attachment['topic_id']);
 		$sql = 'SELECT forum_id, poster_id, post_visibility
 			FROM ' . POSTS_TABLE . '
-			WHERE post_id = ' . (int) $post_id;
+			WHERE post_id = ' . (int) $attachment['post_msg_id'];
 		$result = $this->db->sql_query($sql);
 		$post_row = $this->db->sql_fetchrow($result);
 		$this->db->sql_freeresult($result);
@@ -134,34 +160,59 @@ class downloader
 			throw new http_exception(404, 'ERROR_NO_ATTACHMENT');
 		}
 		
-		$response = new StreamedResponse();
-
-		// Content-type header
-		$response->headers->set('Content-Type', $mimetype);
+		$extensions = array();
+		if (!extension_allowed($post_row['forum_id'], $attachment['extension'], $extensions))
+		{
+			throw new http_exception(403, 'EXTENSION_DISABLED_AFTER_POSTING', [$attachment['extension']]);
+		}
 		
-				if (strpos($mimetype, 'image') !== false
-			|| strpos($mimetype, 'audio') !== false
-			|| strpos($mimetype, 'video') !== false
+		$display_cat = $extensions[$attachment['extension']]['display_cat'];
+
+		if ($thumbnail)
+		{
+			$attachment['physical_filename'] = 'thumb_' . $attachment['physical_filename'];
+		}
+		
+		else if ($display_cat == attachment_category::NONE && !$attachment['is_orphan'])
+		{
+			if (!(($display_cat == attachment_category::IMAGE || $display_cat == attachment_category::THUMB) && !$this->user->optionget('viewimg')))
+			{
+				// Update download count
+				$this->phpbb_increment_downloads($attachment['attach_id']);
+			}
+		}
+		
+		$response = new StreamedResponse();
+		
+		$response->headers->set('Content-Type', $attachment['mimetype']);
+
+		// Display file types in browser and force download for others
+		if (strpos($attachment['mimetype'], 'image') !== false
+			|| strpos($attachment['mimetype'], 'audio') !== false
+			|| strpos($attachment['mimetype'], 'video') !== false
 		)
 		{
 			$disposition = $response->headers->makeDisposition(
 				ResponseHeaderBag::DISPOSITION_INLINE,
-				$filename,
-				$this->filenameFallback($filename)
+				$attachment['real_filename'],
+				$this->filenameFallback($attachment['real_filename'])
 			);
 		}
 		else
 		{
 			$disposition = $response->headers->makeDisposition(
 				ResponseHeaderBag::DISPOSITION_ATTACHMENT,
-				$filename,
-				$this->filenameFallback($filename)
+				$attachment['real_filename'],
+				$this->filenameFallback($attachment['real_filename'])
 			);
 		}
+		
 		$response->headers->set('Content-Disposition', $disposition);
 		
 		$time = new \DateTime();
 		$response->setExpires($time->modify('+1 year'));
+		
+		$physical_name = $attachment['physical_filename'];
 		
 		$response->setCallback(function () use ($physical_name) {
 			readfile($this->config['s3_bucket_link'].''. $physical_name);
@@ -173,7 +224,7 @@ class downloader
 		
 	}
 	
-		/**
+	/**
 	 * Remove non valid characters https://github.com/symfony/http-foundation/commit/c7df9082ee7205548a97031683bc6550b5dc9551
 	 */
 	protected function filenameFallback($filename)
@@ -215,5 +266,13 @@ class downloader
 		{
 			throw new http_exception(403, 'SORRY_AUTH_VIEW_ATTACH');
 		}
+	}
+	
+	protected function phpbb_increment_downloads(int $id): void
+	{
+		$sql = 'UPDATE ' . ATTACHMENTS_TABLE . '
+			SET download_count = download_count + 1
+			WHERE attach_id = ' . $id;
+		$this->db->sql_query($sql);
 	}
 }
