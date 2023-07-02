@@ -10,8 +10,8 @@
 namespace AustinMaddox\s3\event;
 
 use Aws\S3\S3Client;
-use phpbb\controller\helper;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use \phpbb\filesystem\filesystem_interface;
 
 /**
  * Event listener
@@ -34,19 +34,33 @@ class main_listener implements EventSubscriberInterface
 	protected $s3_client;
 	
 	/** @var \phpbb\controller\helper */
-	protected $controller_helper;
+	protected $controller_helper;	
+	
+	/** @var \phpbb\filesystem\filesystem */
+	protected $filesystem;
+	
+	/** @var \phpbb\request\request */
+	protected $request;
+	
+	/** @var \AustinMaddox\s3\core\helper */
+	protected $helper;
+	
+	
 
 	/**
 	 * Constructor
 	 *
 	 */
-	public function __construct(\phpbb\config\config $config, \phpbb\template\template $template, \phpbb\user $user, \phpbb\controller\helper $controller_helper, $phpbb_root_path)
+	public function __construct(\phpbb\config\config $config, \phpbb\template\template $template, \phpbb\user $user, \phpbb\controller\helper $controller_helper, \phpbb\filesystem\filesystem $filesystem, \phpbb\request\request $request, $helper, $phpbb_root_path)
 	{
 		$this->config = $config;
 		$this->template = $template;
 		$this->user = $user;
 		$this->phpbb_root_path = $phpbb_root_path;
 		$this->controller_helper = $controller_helper;
+		$this->filesystem = $filesystem;
+		$this->request = $request;
+		$this->helper = $helper;
 
 		if ($this->config['s3_is_enabled'])
 		{
@@ -71,9 +85,14 @@ class main_listener implements EventSubscriberInterface
 	{
 		return [
 			'core.user_setup'                               => 'user_setup',
-			'core.modify_uploaded_file'                     => 'modify_uploaded_file',
+			//'core.modify_uploaded_file'                     => 'modify_uploaded_file',
 			'core.delete_attachments_from_filesystem_after' => 'delete_attachments_from_filesystem_after',
 			'core.parse_attachments_modify_template_data'   => 'parse_attachments_modify_template_data',
+			//'core.modify_attachment_data_on_submit'   => 'post_test',
+			//'core.modify_attachment_data_on_upload'   => 'post_test1',
+			//'core.modify_attachment_sql_ary_on_submit'   => 'post_test2',
+			//'core.modify_attachment_sql_ary_on_upload'   => 'post_test3',
+			'core.posting_modify_submit_post_after'   => 'post_test3',
 		];
 	}
 
@@ -92,6 +111,48 @@ class main_listener implements EventSubscriberInterface
 	 *
 	 * @param $event
 	 */
+	public function post_test($event)
+	{
+	
+		// print_r($event);
+		// trigger_error($event);
+		// error_log(print_r($event));
+		error_log('test');
+	}	
+	public function post_test1($event)
+	{
+	
+		// print_r($event);
+		// trigger_error($event);
+		// error_log(print_r($event));
+		error_log('test1');
+	}	
+	public function post_test2($event)
+	{
+	
+		// print_r($event);
+		// trigger_error($event);
+		// error_log(print_r($event));
+		error_log('test2');
+	}	
+	public function post_test3($event)
+	{
+	
+		$attachment_data = $event['data']['attachment_data'];
+		foreach($attachment_data as $filedata) 
+		{
+			if ($this->config['s3_is_enabled'])
+			{
+				//$filedata = $event['filedata'];
+				
+				// Fullsize
+				$key = $this->helper->get_physical_filename($filedata['attach_id']);
+				$real_name = $filedata['real_filename'];
+				$body = file_get_contents($this->phpbb_root_path . $this->config['upload_path'] . '/' . $key);
+				$this->uploadFileToS3($key, $body, $filedata['mimetype'], $real_name);
+			}
+		}
+	}
 	public function modify_uploaded_file($event)
 	{
 		if ($this->config['s3_is_enabled'])
@@ -124,7 +185,7 @@ class main_listener implements EventSubscriberInterface
 			}
 		}
 	}
-
+	
 	/**
 	 * Use this event to modify the attachment template data.
 	 *
@@ -136,6 +197,11 @@ class main_listener implements EventSubscriberInterface
 	{
 		if ($this->config['s3_is_enabled'])
 		{
+			$mode = $this->request->variable('mode', '');
+			if ($event['preview'] && $mode != 'edit')
+			{
+				return;
+			}
 			$block_array = $event['block_array'];
 			$attachment = $event['attachment'];
 
@@ -188,6 +254,26 @@ class main_listener implements EventSubscriberInterface
 	private function uploadFileToS3($key, $body, $content_type, $real_name)
 	{
 		$options = array('ContentType' => $content_type, 'ContentDisposition' => "attachment; filename=\"{$real_name}\"");
-		$this->s3_client->upload($this->config['s3_bucket'], $key, $body, 'public-read', array('params' => $options));
+		$request = $this->s3_client->upload($this->config['s3_bucket'], $key, $body, 'public-read', array('params' => $options));
+		$response = $request['@metadata']['statusCode'];
+		if($response == 200)
+		{
+			$filename = utf8_basename($key);
+			$filepath = $this->phpbb_root_path . $this->config['upload_path'] . '/' . $filename;
+			try
+			{
+				if ($this->filesystem->exists($filepath))
+				{
+					$this->filesystem->remove($filepath);
+					return true;
+				}
+			}
+			catch (\phpbb\filesystem\exception\filesystem_exception $exception)
+			{
+				// Fail is covered by return statement below
+			}
+		}
+		
+		
 	}
 }

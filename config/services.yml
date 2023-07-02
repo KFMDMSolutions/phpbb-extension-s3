@@ -6,7 +6,11 @@ services:
             - '@template'
             - '@user'
             - '@controller.helper'
+            - '@filesystem'
+            - '@request' 
+            - '@AustinMaddox.s3.helper'
             - %core.root_path%
+            
         tags:
             - { name: event.listener }
             
@@ -23,3 +27,8 @@ services:
             - '@user'
             - '%core.php_ext%'
             - '%core.root_path%'
+            
+    AustinMaddox.s3.helper:
+        class: AustinMaddox\s3\core\helper
+        arguments:
+            - '@dbal.conn'
